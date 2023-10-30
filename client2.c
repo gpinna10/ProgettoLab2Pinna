@@ -7,6 +7,7 @@
 #include <errno.h>    // richiesto per usare errno
 #include <unistd.h>
 #include <arpa/inet.h>
+#include <stdatomic.h>
 #include <sys/socket.h>
 #include "xerrori.h"
 #define QUI __LINE__,__FILE__
@@ -15,6 +16,9 @@
 #define HOST "127.0.0.1"
 #define PORT 58053
 #define Max_sequence_length 2048 //dimensione massima della sequenza 
+
+// variabile globale che conta le sequenze inviate al server
+atomic_int nsq;
 
 /* Read "n" bytes from a descriptor 
    analoga alla funzione python recv_all() */
@@ -77,7 +81,7 @@ void *task(void *v){
   ssize_t nread;
 
   // apertura del file da leggere
-  FILE *file = fopen(v, "r");
+  FILE *file = xfopen(v, "r", QUI);
   if (!file)
     xtermina("Apertura file da leggere fallita", QUI);
 
@@ -118,12 +122,13 @@ void *task(void *v){
     xtermina("Errore invio stringa fine file", QUI);
 
   // ricevo la lunghezza della sequenza dal server
-  int nsq;
-  e = readn(filed_socket, &nsq, sizeof(nsq));
+  int x;
+  e = readn(filed_socket, &x, sizeof(x));
   if (e < 0)
-    xtermina("Errore ricezione lunghezza sequenza", QUI);
+    xtermina("Errore ricezione sequenze ricevute", QUI);
 
-  fprintf(stdout, "Lunghezza massima sequenza: %d\n", ntohl(nsq));
+  // aggiorno il contatore delle sequenze ricevute
+  nsq = nsq + ntohl(x);
 
   fclose(file);
   free(line);
@@ -148,6 +153,8 @@ int main(int argc, char *argv[]){
     if(xpthread_join(t[i], NULL, QUI) != 0)
       xtermina("Errore join thread\n", QUI);
   }
+
+  fprintf(stdout, "sequenze totali ricevute: %d\n", nsq);
     
   return 0;
 }
