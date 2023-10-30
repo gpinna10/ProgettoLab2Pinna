@@ -8,7 +8,7 @@ Client1 è un programma client scritto in C che prende in input un singolo file,
 
 Client2: 
 
-Molto simile al client1 a differenza che si possono ricevere un numero indefinito di file in input. In questo programma ogni file viene gestito da un thread che viene creato con xpthread_create(), funzione che permette la creazione di un thread, il nuovo thread inizia invocando task, una funzione con comportamente uguale a client1, con l'aggiunta di un readn(), funzione che legge nella socket i dati ricevuti dal server e li inserisce in un buffer (nsq), il server invia al client il numero di sequenze ricevute da esso.
+Molto simile al client1 a differenza che si possono ricevere un numero indefinito di file in input. In questo programma ogni file viene gestito da un thread che viene creato con xpthread_create(), funzione che permette la creazione di un thread, il nuovo thread inizia invocando task, una funzione con comportamente uguale a client1, con l'aggiunta di un readn(), funzione che legge nella socket i dati ricevuti dal server e li inserisce in nsq, un contatore globale che conta il numero di sequenze ricevute che poi verrà stampato alla fine della connessione.
 
 Server:
 
