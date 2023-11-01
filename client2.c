@@ -137,7 +137,6 @@ void *task(void *v){
 
   // aggiorno il contatore delle sequenze ricevute
   (args->nsq) = ntohl(x);
-  printf("Sequenze ricevute: %d\n", args->nsq);
 
   fclose(file);
   free(line);
