@@ -87,8 +87,7 @@ void *task(void *v){
   char *line = NULL;
   size_t len = 0;
   ssize_t nread;
-
-  printf("File: %s\n", args->nome_f);
+  
   // apertura del file da leggere
   FILE *file = xfopen((args->nome_f), "r", QUI);
   if (!file)
@@ -168,7 +167,6 @@ int main(int argc, char *argv[]){
     if(xpthread_join(t[i], NULL, QUI) != 0)
       xtermina("Errore join thread\n", QUI);
     sum += args[i].nsq;
-    printf("Somma parziale: %d\n", sum);
   }
 
   fprintf(stdout, "sequenze totali ricevute: %d\n", sum);
