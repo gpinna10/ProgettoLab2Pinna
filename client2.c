@@ -87,7 +87,7 @@ void *task(void *v){
   char *line = NULL;
   size_t len = 0;
   ssize_t nread;
-  
+
   // apertura del file da leggere
   FILE *file = xfopen((args->nome_f), "r", QUI);
   if (!file)
