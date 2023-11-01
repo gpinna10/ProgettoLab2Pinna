@@ -75,7 +75,7 @@ ENTRY *crea_entry(char *s, int n) {
   if (e->data == NULL)
     xtermina("errore malloc entry 3", QUI);
   *((int *)e->data) = n;
-  // Ora eseguo un casting per poter accedere ai campi della struct coppia
+  // Casting necessario per poter accedere ai campi della struct coppia
   coppia *c = (coppia *)e->data;
   c->valore = n;
   c->next = NULL;
@@ -123,11 +123,12 @@ int conta(char *s){
   return num;
 }
 
-void hash_delete(ENTRY *lis){
-  if (lis != NULL) {
-    coppia *c = lis->data;
-    hash_delete(c->next); //distruggo ricorsivamente
-    distruggi_entry(lis);
+void h_delete(ENTRY *e){
+  //Rimuovo i dati all'interno della hash table
+  if (e != NULL) {
+    coppia *c = e->data;
+    h_delete(c->next);
+    distruggi_entry(e);
   }
 }
 
@@ -146,12 +147,13 @@ void *t_capolet(void *v) {
     ssize_t n_byte = read(a->pipe_capolet, &pipe_len, sizeof(int));
     if (n_byte == -1)
       xtermina("errore lettura lunghezza pipe capolet", QUI);
-    if (n_byte == 0){
+    if (n_byte == 0){ //pipe chiusa, termino capolettore
       // svuoto il buffer dei scrittori
       for(int i=0; i<PC_buffer_len; i++){
+        //inserisco valori nulli su tutto il buffer per poi essere letti dai lettori
         a->buffer_reader[i] = NULL;
         a->ind_read = i;
-        sem_post(a->sem_empty_r);
+        xsem_post(a->sem_empty_r,QUI);
       }
       free(pipe_buffer);
       pthread_exit(NULL);
@@ -191,7 +193,7 @@ void *t_lettore(void *v){
     // attendo finchè non ricevo un segnale dal capolettore
     token = a->buffer_reader[a->ind_read];    
     if(token  == NULL){
-      pthread_mutex_unlock(a->mutex_reader);
+      xpthread_mutex_unlock(a->mutex_reader, QUI);
       xsem_post(a->sem_empty_r, QUI);
       pthread_exit(NULL);
     }
@@ -204,7 +206,7 @@ void *t_lettore(void *v){
     free(a->buffer_reader[a->ind_read]);
     a->buffer_reader[a->ind_read] = NULL;
     a->ind_read = ((a->ind_read)+1) % PC_buffer_len;
-    pthread_mutex_unlock(a->mutex_reader);
+    xpthread_mutex_unlock(a->mutex_reader, QUI);
     xsem_post(a->sem_full_r, QUI);
   }
 }
@@ -229,7 +231,7 @@ void *t_caposc(void *v) {
       for(int i=0; i<PC_buffer_len; i++){
         a->buffer_writer[i] = NULL;
         a->ind_write = i;
-        sem_post(a->sem_empty_w);
+        xsem_post(a->sem_empty_w, QUI);
       }
       free(pipe_buffer);
       pthread_exit(NULL);
@@ -272,18 +274,18 @@ void *t_scrittore(void *v){
     // attendo finchè non ricevo un segnale dal capolettore
     token = a->buffer_writer[a->ind_write];
     if(token == NULL){
-      pthread_mutex_unlock(a->mutex_writer);
+      xpthread_mutex_unlock(a->mutex_writer, QUI);
       xsem_post(a->sem_empty_w, QUI);
       pthread_exit(NULL);
     }
     // eseguo conta con il token trovato
-    read_lock(rw_HT);
+    write_lock(rw_HT);
     aggiungi(token);  
-    read_unlock(rw_HT);
+    write_unlock(rw_HT);
     free(a->buffer_writer[a->ind_write]);
     a->buffer_writer[a->ind_write] = NULL;
     a->ind_write = ((a->ind_write)+1) % PC_buffer_len;
-    pthread_mutex_unlock(a->mutex_writer);
+    xpthread_mutex_unlock(a->mutex_writer, QUI);
     xsem_post(a->sem_full_w, QUI);
   }
 }
@@ -302,7 +304,7 @@ void *signal_handler(void *v){
     //attendo il ricevimento di un segnale
     int e = sigwait(&mask, &signo);
     if(e != 0)
-      xtermina("errore sigwait", QUI);
+      xtermina("SigHandler: errore sigwait", QUI);
 
     if(signo == SIGINT)   //ricevo il SIGINT
       fprintf(stderr, "SIGINT: elementi presenti nella tabella: %d\n", elem_HT);
@@ -310,20 +312,20 @@ void *signal_handler(void *v){
     if(signo == SIGTERM){ //ricevo il SIGTERM
       //termino i thread capolettore e caposcrittore
       if(xpthread_join(*(a->capolett),NULL,QUI) != 0)
-        xtermina("errore pthread_cond_wait capolettore", QUI);
+        xtermina("SigHandler: errore join capolettore", QUI);
       if(xpthread_join(*(a->caposcritt),NULL,QUI) != 0)
-        xtermina("errore pthread_cond_wait caposcrittore", QUI);
+        xtermina("SigHandler: errore join caposcrittore", QUI);
       fprintf(stderr, "elementi presenti nella tabella: %d\n", elem_HT);
 
       //dealloco la tabella hash
-      hash_delete(testa_lista_entry);
+      h_delete(testa_lista_entry);
       hdestroy();
       pthread_exit(NULL);
     }
 
     if(signo == SIGUSR1){ //ricevo il SIGUSR1
       //dealloco la tabella hash
-      hash_delete(testa_lista_entry);
+      h_delete(testa_lista_entry);
       hdestroy();
       //creo una nuova lista
       testa_lista_entry = NULL;
@@ -452,12 +454,12 @@ int main(int argc, char *argv[]) {
   //join thread
 
   for(int i=0; i<n_lettori; i++){
-    if(pthread_join(lettori[i], NULL) != 0)
+    if(xpthread_join(lettori[i], NULL, QUI) != 0)
       xtermina("errore join lettore", QUI);
   }
 
   for(int i=0; i<n_scrittori; i++){
-    if(pthread_join(scrittori[i], NULL) != 0)
+    if(xpthread_join(scrittori[i], NULL, QUI) != 0)
       xtermina("errore join scrittore", QUI);
   }
 
