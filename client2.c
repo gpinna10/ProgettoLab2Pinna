@@ -20,6 +20,11 @@
 // variabile globale che conta le sequenze inviate al server
 atomic_int nsq;
 
+typedef struct{
+  char* nome_f;
+  int nsq;
+} task_args;
+
 /* Read "n" bytes from a descriptor 
    analoga alla funzione python recv_all() */
 ssize_t readn(int fd, void *ptr, size_t n) {  
@@ -59,6 +64,9 @@ ssize_t writen(int fd, void *ptr, size_t n) {
 //task eseguito dal thread
 void *task(void *v){
 
+  // recupero i parametri
+  task_args *args = (task_args *)v;
+
   // creazione socket
   int filed_socket = socket(AF_INET, SOCK_STREAM, 0);
   if (filed_socket < 0)
@@ -80,8 +88,9 @@ void *task(void *v){
   size_t len = 0;
   ssize_t nread;
 
+  printf("File: %s\n", args->nome_f);
   // apertura del file da leggere
-  FILE *file = xfopen(v, "r", QUI);
+  FILE *file = xfopen((args->nome_f), "r", QUI);
   if (!file)
     xtermina("Apertura file da leggere fallita", QUI);
 
@@ -128,7 +137,8 @@ void *task(void *v){
     xtermina("Errore ricezione sequenze ricevute", QUI);
 
   // aggiorno il contatore delle sequenze ricevute
-  nsq = nsq + ntohl(x);
+  (args->nsq) = ntohl(x);
+  printf("Sequenze ricevute: %d\n", args->nsq);
 
   fclose(file);
   free(line);
@@ -142,19 +152,27 @@ int main(int argc, char *argv[]){
   // inizializzo i thread
   pthread_t t[argc-1];
 
+  // inizializzo la struct che contiene i parametri
+  task_args *args = malloc((argc-1)*sizeof(task_args));
+
   for(int i=0; i<argc-1; i++){
-    // assegno il nome del file al campo nome_file della struct
-    if(xpthread_create(&t[i], NULL, &task, argv[i+1], QUI) != 0)
+  // assegno il nome del file al campo nome_file della struct
+    args[i].nome_f = argv[i+1];
+    args[i].nsq = 0;
+    if(xpthread_create(&t[i], NULL, &task, &args[i], QUI) != 0)
       xtermina("Errore creazione thread\n", QUI);
   }
-
+  int sum =0;
   // aspetto che tutti i thread terminino
   for(int i=0; i<argc-1; i++){
     if(xpthread_join(t[i], NULL, QUI) != 0)
       xtermina("Errore join thread\n", QUI);
+    sum += args[i].nsq;
+    printf("Somma parziale: %d\n", sum);
   }
 
-  fprintf(stdout, "sequenze totali ricevute: %d\n", nsq);
-    
+  fprintf(stdout, "sequenze totali ricevute: %d\n", sum);
+
+  free(args);  
   return 0;
 }
