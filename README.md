@@ -1,6 +1,6 @@
 Relazione Progetto 
 
-Giovanni Giuseppe Pinna [618053]
+Giovanni Giuseppe Pinna
 
 Client1:
 
